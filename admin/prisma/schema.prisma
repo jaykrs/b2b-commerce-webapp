@@ -22,7 +22,7 @@ model User {
   phone           String?
   profileImageId  Int?
   systemReserve   Boolean   @default(false)
-  status          Int       @default(1)
+  status          Int       @default(0)
   createdById     Int?
   updatedById     Int?
   emailVerifiedAt DateTime?
@@ -33,6 +33,7 @@ model User {
   orders          Order[]
   wallet          Wallet?
   point           Point?
+  otp             Int       @default(0)
 }
 
 model Role {

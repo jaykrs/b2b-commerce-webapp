@@ -1,71 +1,50 @@
-import { NextResponse } from 'next/server';
-import { parseAuthCookie, verifyJwt } from '../../utils/jwt';
-import { hashSync } from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from "next/server";
+import { parseAuthCookie, verifyJwt } from "../../utils/jwt";
+import { hashSync } from "bcryptjs";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-export async function GET(request) {
-  const token = parseAuthCookie(request.headers.get('cookie'));
-  const payload = token ? verifyJwt(token) : null;
+/**
+ * Centralized messages
+ */
+const MESSAGES = {
+  UNAUTHORIZED: "Unauthorized",
+  MISSING_FIELDS: "Missing required fields.",
+  USER_EXISTS: (email) => `User already exists with ${email}`,
+  USER_CREATED: "User created successfully",
+  SERVER_ERROR: "Internal Server Error",
+};
 
-  if (!payload) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  return NextResponse.json({ userId: payload.userId, username: payload.username });
+/**
+ * Authenticate user from JWT in cookies
+ * @param {Request} request
+ * @returns {object|null} payload
+ */
+function authenticate(request) {
+  const token = parseAuthCookie(request.headers.get("cookie"));
+  return token ? verifyJwt(token) : null;
 }
 
+/**
+ * GET handler - returns authenticated user info
+ */
+export async function GET(request) {
+  const payload = authenticate(request);
 
-// export async function POST(request) {
-//   try {
-//     const body = await request.json();
+  if (!payload) {
+    return NextResponse.json({ error: MESSAGES.UNAUTHORIZED }, { status: 401 });
+  }
 
-//     const {
-//       name,
-//       email,
-//       password,
-//       countryCode,
-//       phone,
-//       profileImageId,
-//       createdById,
-//       role
-//     } = body;
+  return NextResponse.json(
+    { userId: payload.userId, username: payload.email },
+    { status: 200 }
+  );
+}
 
-
-//     // Simple validation (you can use zod/yup for better validation)
-//     if (!name || !email || !password || !phone ) {
-//       return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
-//     }
-//     const hashedPassword = hashSync(password, 10);
-//     const isUserExist = await prisma.user.findUnique({
-//       where: {
-//         email: email
-//       }
-//     })
-//     if (isUserExist) {
-//       return NextResponse.json({ error: 'User already exist with ' + email }, { status: 401 });
-//     }
-//     const user = await prisma.user.create({
-//       data: {
-//         name,
-//         email,
-//         password: hashedPassword,
-//         countryCode,
-//         phone,
-//         profileImageId,
-//         createdById
-//       },
-//     });
-
-//     return NextResponse.json(user, { status: 201 });
-//   } catch (error) {
-//     console.error("[USER_POST_ERROR]", error);
-//     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-//   }
-// }
-
-
+/**
+ * POST handler - creates a new user
+ */
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -75,45 +54,36 @@ export async function POST(request) {
       password,
       countryCode,
       phone,
-      profileImageId,
-      createdById,
-      role // This should be the role ID you want to assign
     } = body;
 
-    if (!name || !email || !password || !phone || !role) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    // Validate required fields
+    if (!name || !email || !password || !phone ||!countryCode) {
+      return NextResponse.json(
+        { error: MESSAGES.MISSING_FIELDS },
+        { status: 400 }
+      );
     }
 
-    const isUserExist = await prisma.user.findUnique({
-      where: { email }
-    });
-
-    if (isUserExist) {
-      return NextResponse.json({ error: 'User already exists with ' + email }, { status: 409 });
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json(
+        { error: MESSAGES.USER_EXISTS(email) },
+        { status: 409 }
+      );
     }
 
+    // Hash password
     const hashedPassword = hashSync(password, 10);
 
-    // Step 1: Create the user
-
-
-    const isRoleExist = await prisma.role.findUnique({
-      where: { name: role }
-    });
-    let isRoleExistWithUser;
-    if (!isRoleExist) {
-       isRoleExistWithUser = await prisma.role.findUnique({
-        where: { name: 'user' }
-      });
-      if (!isRoleExistWithUser) {
-        isRoleExistWithUser = await prisma.role.create({
-          data: {
-            name: 'user'
-          }
-        });
+    // Ensure role exists, fallback to 'user'
+    let userRole = await prisma.role.findUnique({ where: { name: 'Guest' } });
+    if (!userRole) {
+        userRole = await prisma.role.create({ data: { name: "Guest" } });
       }
-    }
-
+    //let random = Math.floor(100000 + Math.random() * 900000);
+    // Create user
+    let random = 123456;
     const newUser = await prisma.user.create({
       data: {
         name,
@@ -121,23 +91,21 @@ export async function POST(request) {
         password: hashedPassword,
         countryCode,
         phone,
-        profileImageId,
-        createdById,
-        status: 1,
-        roleId: isRoleExist ? isRoleExist.id : isRoleExistWithUser.id
-      }
+        status: 0,
+        roleId: userRole.id,
+        otp: random
+      },
     });
 
     return NextResponse.json(
-      {
-        message: "User created successfully",
-        user: newUser
-      },
+      { message: MESSAGES.USER_CREATED, email: newUser.email },
       { status: 201 }
     );
-
   } catch (error) {
     console.error("[USER_POST_ERROR]", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: MESSAGES.SERVER_ERROR },
+      { status: 500 }
+    );
   }
 }
