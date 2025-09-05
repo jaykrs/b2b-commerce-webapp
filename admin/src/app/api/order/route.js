@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import order from "./order.json";
+import { verifyJwt, parseAuthCookie } from "../utils/jwt";
 
 export async function GET(request) {
+  const token = parseAuthCookie(request.headers.get('cookie'));
+  const payload = token ? verifyJwt(token) : null;
+  if (!payload) {
+    const response = NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    response.cookies.set("token", "", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 0, // 👈 Expires immediately
+    });
+    return response;
+  }
+
   const searchParams = request?.nextUrl?.searchParams;
   const queryCategory = searchParams.get("category");
   const querySortBy = searchParams.get("sortBy");

@@ -6,20 +6,20 @@ const nextConfig = {
     API_PROD_URL: "http://localhost:3000/api/",
     storageURL: "http://localhost:3000/assets", 
   },
-  redirects: async () => {
-    return [
-      {
-        source: "/",
-        destination: "/dashboard",
-        permanent: true,  
-      },
-      {
-        source: "/en",
-        destination: "/dashboard",
-        permanent: true,
-      },
-    ];
-  },
+  // redirects: async () => {
+  //   return [
+  //     {
+  //       source: "/",
+  //       destination: "/auth/login",
+  //       permanent: true,  
+  //     },
+  //     {
+  //       source: "/en",
+  //       destination: "/auth/login",
+  //       permanent: true,
+  //     },
+  //   ];
+  // },
   images: {
     remotePatterns: [
       {

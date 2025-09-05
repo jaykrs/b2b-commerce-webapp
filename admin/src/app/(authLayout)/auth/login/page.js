@@ -1,10 +1,10 @@
 "use client";
-import { ReactstrapInput } from "@/components/reactstrapFormik";
-import ShowBox from "@/elements/alerts&Modals/ShowBox";
-import Btn from "@/elements/buttons/Btn";
-import SettingContext from "@/helper/settingContext";
-import LoginBoxWrapper from "@/utils/hoc/LoginBoxWrapper";
-import { YupObject, emailSchema, nameSchema } from "@/utils/validation/ValidationSchemas";
+import { ReactstrapInput } from "../../../../components/reactstrapFormik";
+import ShowBox from "../../../../elements/alerts&Modals/ShowBox";
+import Btn from "../../../../elements/buttons/Btn";
+import SettingContext from "../../../../helper/settingContext";
+import LoginBoxWrapper from "../../../../utils/hoc/LoginBoxWrapper";
+import { YupObject, emailSchema, nameSchema } from "../../../../utils/validation/ValidationSchemas";
 import { ErrorMessage, Field, Form, Formik } from "formik";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,6 +13,7 @@ import ReCAPTCHA from "react-google-recaptcha";
 import { useTranslation } from "react-i18next";
 import { Col } from "reactstrap";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 const Login = () => {
   const [showBoxMessage, setShowBoxMessage] = useState();
@@ -20,6 +21,36 @@ const Login = () => {
   const { t } = useTranslation("common");
   const reCaptchaRef = useRef();
   const router = useRouter();
+
+  const handleLogin = async (email, password) => {
+    try {
+      if (email === "" || password === "") {
+        return alert("email or password is missing!");
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return alert('enter valid email');
+      }
+      const res = await axios.post('/api/auth/login', {
+        email: email,
+        password: password
+      }, { withCredentials: true });
+      if (res.status == 200) {
+        alert('login success!');
+        router.push('/dashboard');
+      } else {
+        alert("login failed!");
+      }
+    } catch (err) {
+      if (err.status == 401 && err.response.data.error == "User is not active") {
+        alert("your account is inactive, please verify to proceed!");
+        localStorage.setItem('email', email);
+        router.push(`/auth/otp-verification`);
+      } else {
+        alert(err);
+      }
+
+    }
+  }
 
   return (
     <div className="box-wrapper">
@@ -32,15 +63,17 @@ const Login = () => {
         <div className="input-box">
           <Formik
             initialValues={{
-              email: "admin@example.com",
-              password: "123456789",
+              email: "",
+              password: "",
             }}
             validationSchema={YupObject({
               email: emailSchema,
               password: nameSchema,
               // recaptcha: settingObj?.google_reCaptcha?.status ? recaptchaSchema : "",
             })}
-            onSubmit={() => router.push(`/dashboard`)}
+            onSubmit={(values) => {
+              handleLogin(values.email, values.password);
+            }}
           >
             {({ errors, touched, setFieldValue }) => (
               <Form className="row g-4">
